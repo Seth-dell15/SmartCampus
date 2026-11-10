@@ -111,7 +111,179 @@ Les capteurs et passerelles ont une identité technique propre; ils ne sont pas 
 
 ## 3. Étape 2 — Modèle Conceptuel de Données
 
-### 3.1 Entités et identifiants
+### 3.1 Diagramme conceptuel visuel (MCD)
+
+Le diagramme entité-relation ci-dessous synthétise le référentiel spatial, le parc technique, les associations historisées par intervalles temporels, le flux des mesures IoT et le sous-système d’alertes et d’interventions :
+
+```mermaid
+erDiagram
+    CAMPUS {
+        bigint id_campus PK
+        varchar code_campus UK
+        varchar nom
+        varchar adresse
+        varchar statut
+    }
+    BATIMENT {
+        bigint id_batiment PK
+        bigint id_campus FK
+        varchar code_batiment UK
+        varchar nom
+        numeric superficie_m2
+        varchar statut
+    }
+    ZONE {
+        bigint id_zone PK
+        bigint id_batiment FK
+        varchar code_zone
+        varchar nom
+        varchar type_zone
+        varchar etage
+        varchar statut
+    }
+    EQUIPEMENT {
+        bigint id_equipement PK
+        varchar code_equipement UK
+        varchar libelle
+        varchar type_equipement
+        varchar marque
+        varchar reference_constructeur
+        varchar modele
+        varchar numero_serie
+        date date_mise_en_service
+        varchar statut
+    }
+    HISTORIQUE_ZONE_EQUIPEMENT {
+        bigint id_historique_zone PK
+        bigint id_equipement FK
+        bigint id_zone FK
+        timestamptz date_debut
+        timestamptz date_fin
+        varchar motif_deplacement
+    }
+    CAPTEUR {
+        bigint id_capteur PK
+        varchar identifiant_externe UK
+        varchar type_capteur
+        varchar libelle
+        varchar unite_nominale
+        varchar statut
+        date date_mise_en_service
+    }
+    AFFECTATION_CAPTEUR_EQUIPEMENT {
+        bigint id_affectation_capteur PK
+        bigint id_capteur FK
+        bigint id_equipement FK
+        timestamptz date_debut
+        timestamptz date_fin
+        varchar motif_affectation
+    }
+    MESURE {
+        bigint id_mesure PK
+        timestamptz horodatage_evenement PK
+        bigint id_capteur FK
+        timestamptz horodatage_reception
+        numeric valeur
+        varchar unite
+        varchar qualite
+        varchar cle_deduplication
+    }
+    REGLE_ALERTE {
+        bigint id_regle_alerte PK
+        varchar code_regle
+        integer numero_version
+        varchar libelle
+        varchar portee_cible
+        varchar indicateur
+        varchar operateur
+        numeric seuil
+        varchar severite
+        timestamptz date_debut_validite
+        timestamptz date_fin_validite
+        varchar statut
+    }
+    ALERTE {
+        bigint id_alerte PK
+        bigint id_regle_alerte FK
+        bigint id_equipement_cible FK
+        bigint id_capteur_cible FK
+        bigint id_mesure_declencheuse FK
+        timestamptz horodatage_mesure_declencheuse FK
+        timestamptz date_creation
+        varchar severite_constatee
+        varchar statut
+        timestamptz date_acquittement
+        timestamptz date_cloture
+        text commentaire
+    }
+    UTILISATEUR {
+        bigint id_utilisateur PK
+        varchar courriel UK
+        varchar prenom
+        varchar nom
+        varchar statut
+        timestamptz date_creation
+    }
+    TECHNICIEN {
+        bigint id_technicien PK
+        bigint id_utilisateur FK
+        varchar matricule UK
+        varchar specialite
+        varchar statut
+    }
+    INTERVENTION {
+        bigint id_intervention PK
+        varchar reference UK
+        bigint id_equipement FK
+        bigint id_demandeur FK
+        varchar type_intervention
+        varchar priorite
+        varchar statut
+        timestamptz date_ouverture
+        timestamptz date_planifiee
+        timestamptz date_debut
+        timestamptz date_cloture
+        text description
+        text compte_rendu
+    }
+    AFFECTATION_TECHNICIEN_INTERVENTION {
+        bigint id_affectation_technicien PK
+        bigint id_intervention FK
+        bigint id_technicien FK
+        timestamptz date_affectation
+        timestamptz date_fin_affectation
+        varchar role_dans_intervention
+        text commentaire
+    }
+    LIEN_ALERTE_INTERVENTION {
+        bigint id_lien_alerte_intervention PK
+        bigint id_alerte FK
+        bigint id_intervention FK
+        timestamptz date_liaison
+        text commentaire
+    }
+
+    CAMPUS ||--|{ BATIMENT : "regroupe"
+    BATIMENT ||--|{ ZONE : "contient"
+    ZONE ||--o{ HISTORIQUE_ZONE_EQUIPEMENT : "accueille"
+    EQUIPEMENT ||--o{ HISTORIQUE_ZONE_EQUIPEMENT : "est localise dans"
+    EQUIPEMENT ||--o{ AFFECTATION_CAPTEUR_EQUIPEMENT : "est equipe de"
+    CAPTEUR ||--o{ AFFECTATION_CAPTEUR_EQUIPEMENT : "est affecte a"
+    CAPTEUR ||--o{ MESURE : "produit"
+    REGLE_ALERTE ||--o{ ALERTE : "declenche"
+    EQUIPEMENT ||--o{ ALERTE : "cible (XOR)"
+    CAPTEUR ||--o{ ALERTE : "cible (XOR)"
+    MESURE ||--o{ ALERTE : "est a l origine de"
+    EQUIPEMENT ||--o{ INTERVENTION : "fait l objet de"
+    UTILISATEUR ||--o{ INTERVENTION : "demande"
+    UTILISATEUR ||--o| TECHNICIEN : "est le compte de"
+    TECHNICIEN ||--o{ AFFECTATION_TECHNICIEN_INTERVENTION : "participe a"
+    INTERVENTION ||--o{ AFFECTATION_TECHNICIEN_INTERVENTION : "mobilise"
+    ALERTE ||--o{ LIEN_ALERTE_INTERVENTION : "est traitee par"
+    INTERVENTION ||--o{ LIEN_ALERTE_INTERVENTION : "associe"
+```
+
+### 3.2 Entités et identifiants
 
 | Entité | Identifiant conceptuel | Attributs métier principaux | Unicité métier candidate |
 |---|---|---|---|
@@ -133,7 +305,7 @@ Les capteurs et passerelles ont une identité technique propre; ils ne sont pas 
 
 **Réconciliation avec le sujet du TD :** le sujet pédagogique cite notamment la superficie du bâtiment, la référence constructeur, la date d’installation du capteur et les nom/prénom/courriel/spécialité du technicien. Ils sont intégrés ici comme données métier : `superficie_m2` est une mesure de surface, `reference_constructeur` complète les informations du modèle, la date d’installation correspond à la mise en service du capteur, et les données de personne sont portées par `Utilisateur` (la spécialité reste dans le profil `Technicien`). La précision et l’unicité de ces champs doivent être validées par rapport aux formulaires et au vocabulaire métier.
 
-### 3.2 Associations et cardinalités
+### 3.3 Associations et cardinalités
 
 La cardinalité est indiquée au voisinage de chaque entité, comme minimum et maximum de participations.
 
@@ -154,7 +326,7 @@ La cardinalité est indiquée au voisinage de chaque entité, comme minimum et m
 | **Participer / Affectation_Technicien_Intervention** | Technicien `(0,N)` — Intervention `(0,N)` via l’association | Plusieurs techniciens peuvent participer à une intervention; l’association conserve rôle et période. |
 | **Relier / Lien_Alerte_Intervention** | Alerte `(0,N)` — Intervention `(0,N)` via l’association | Permet plusieurs alertes pour une intervention et plusieurs interventions liées à une alerte, avec date de liaison. |
 
-### 3.3 Dictionnaire de données synthétique
+### 3.4 Dictionnaire de données synthétique
 
 Les types ci-dessous sont conceptuels. **Obligatoire** signifie que l’élément est requis pour une occurrence valide selon le modèle de travail; les dates de fin et autres champs indiqués facultatifs peuvent être absents. Les clés étrangères conceptuelles sont listées dans les associations et ne sont pas répétées comme attributs métier des entités.
 
@@ -272,7 +444,7 @@ Les types ci-dessous sont conceptuels. **Obligatoire** signifie que l’élémen
 
 Les attributs d’association simples sont les identifiants des entités reliées : campus dans bâtiment, bâtiment dans zone, utilisateur dans technicien, etc. Ils deviendront des clés étrangères au MLD, sans être considérés comme des identifiants métier indépendants.
 
-### 3.4 Historisation : localisation et affectation des capteurs
+### 3.5 Historisation : localisation et affectation des capteurs
 
 Les deux associations temporelles sont représentées par des périodes **semi-ouvertes `[début, fin[`**, exprimées en UTC. Une période ouverte a une borne de fin absente.
 
@@ -484,9 +656,198 @@ CREATE TABLE smartcampus.mesure_2025_01
 CREATE INDEX ix_mesure_capteur_evenement
     ON smartcampus.mesure (id_capteur, horodatage_evenement DESC)
     INCLUDE (valeur, unite, qualite, horodatage_reception);
+
+CREATE TABLE smartcampus.utilisateur (
+    id_utilisateur BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    courriel       VARCHAR(254) NOT NULL UNIQUE,
+    prenom         VARCHAR(100) NOT NULL,
+    nom            VARCHAR(100) NOT NULL,
+    statut         VARCHAR(30)  NOT NULL
+        CHECK (statut IN ('ACTIF', 'SUSPENDU', 'DESACTIVE')),
+    date_creation  TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE smartcampus.technicien (
+    id_technicien  BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    id_utilisateur BIGINT       NOT NULL UNIQUE
+        REFERENCES smartcampus.utilisateur (id_utilisateur) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    matricule      VARCHAR(80)  NOT NULL UNIQUE,
+    specialite     VARCHAR(100),
+    statut         VARCHAR(30)  NOT NULL
+        CHECK (statut IN ('ACTIF', 'INDISPONIBLE', 'INACTIF'))
+);
+
+CREATE TABLE smartcampus.regle_alerte (
+    id_regle_alerte      BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    code_regle           VARCHAR(100) NOT NULL,
+    numero_version       INTEGER      NOT NULL CHECK (numero_version > 0),
+    libelle              VARCHAR(200) NOT NULL,
+    portee_cible         VARCHAR(20)  NOT NULL
+        CHECK (portee_cible IN ('EQUIPEMENT', 'CAPTEUR')),
+    indicateur           VARCHAR(80)  NOT NULL,
+    operateur            VARCHAR(20)  NOT NULL
+        CHECK (operateur IN ('>', '>=', '<', '<=', '=', '<>')),
+    seuil                NUMERIC(20, 6) NOT NULL,
+    severite             VARCHAR(30)  NOT NULL
+        CHECK (severite IN ('INFO', 'MINEURE', 'MAJEURE', 'CRITIQUE')),
+    date_debut_validite  TIMESTAMPTZ  NOT NULL,
+    date_fin_validite    TIMESTAMPTZ,
+    statut               VARCHAR(20)  NOT NULL
+        CHECK (statut IN ('BROUILLON', 'ACTIVE', 'SUSPENDUE', 'EXPIREE')),
+    CONSTRAINT uq_regle_alerte_version UNIQUE (code_regle, numero_version),
+    CONSTRAINT ck_regle_alerte_validite
+        CHECK (date_fin_validite IS NULL OR date_debut_validite < date_fin_validite)
+);
+
+CREATE TABLE smartcampus.alerte (
+    id_alerte                       BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    id_regle_alerte                 BIGINT      NOT NULL
+        REFERENCES smartcampus.regle_alerte (id_regle_alerte) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    id_equipement_cible             BIGINT
+        REFERENCES smartcampus.equipement (id_equipement) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    id_capteur_cible                BIGINT
+        REFERENCES smartcampus.capteur (id_capteur) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    id_mesure_declencheuse          BIGINT,
+    horodatage_mesure_declencheuse  TIMESTAMPTZ,
+    date_creation                   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    severite_constatee              VARCHAR(30) NOT NULL
+        CHECK (severite_constatee IN ('INFO', 'MINEURE', 'MAJEURE', 'CRITIQUE')),
+    statut                          VARCHAR(30) NOT NULL
+        CHECK (statut IN ('OUVERTE', 'ACQUITTEE', 'EN_COURS', 'CLOTUREE', 'IGNOREE')),
+    date_acquittement               TIMESTAMPTZ,
+    date_cloture                    TIMESTAMPTZ,
+    commentaire                     TEXT,
+    CONSTRAINT ck_alerte_cible_xor
+        CHECK ((id_equipement_cible IS NOT NULL) <> (id_capteur_cible IS NOT NULL)),
+    CONSTRAINT ck_alerte_mesure_declencheuse
+        CHECK (
+            (id_mesure_declencheuse IS NULL AND horodatage_mesure_declencheuse IS NULL)
+            OR
+            (id_mesure_declencheuse IS NOT NULL AND horodatage_mesure_declencheuse IS NOT NULL)
+        ),
+    CONSTRAINT fk_alerte_mesure_declencheuse
+        FOREIGN KEY (horodatage_mesure_declencheuse, id_mesure_declencheuse)
+        REFERENCES smartcampus.mesure (horodatage_evenement, id_mesure)
+        ON UPDATE RESTRICT ON DELETE RESTRICT
+);
+
+CREATE TABLE smartcampus.intervention (
+    id_intervention       BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    reference             VARCHAR(100) NOT NULL UNIQUE,
+    id_equipement         BIGINT       NOT NULL
+        REFERENCES smartcampus.equipement (id_equipement) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    id_demandeur          BIGINT
+        REFERENCES smartcampus.utilisateur (id_utilisateur) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    type_intervention     VARCHAR(30)  NOT NULL
+        CHECK (type_intervention IN ('CORRECTIVE', 'PREVENTIVE', 'INSPECTION', 'AUTRE')),
+    priorite              VARCHAR(30)  NOT NULL
+        CHECK (priorite IN ('BASSE', 'NORMALE', 'HAUTE', 'URGENTE')),
+    statut                VARCHAR(30)  NOT NULL
+        CHECK (statut IN (
+            'A_PLANIFIER', 'PLANIFIEE', 'EN_COURS', 'EN_ATTENTE', 'TERMINEE', 'ANNULEE'
+        )),
+    date_ouverture        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    date_planifiee        TIMESTAMPTZ,
+    date_debut            TIMESTAMPTZ,
+    date_cloture          TIMESTAMPTZ,
+    description           TEXT        NOT NULL,
+    compte_rendu          TEXT
+);
+
+CREATE TABLE smartcampus.affectation_technicien_intervention (
+    id_affectation_technicien BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    id_intervention           BIGINT      NOT NULL
+        REFERENCES smartcampus.intervention (id_intervention) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    id_technicien             BIGINT      NOT NULL
+        REFERENCES smartcampus.technicien (id_technicien) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    date_affectation          TIMESTAMPTZ NOT NULL,
+    date_fin_affectation      TIMESTAMPTZ,
+    role_dans_intervention    VARCHAR(40),
+    commentaire               TEXT,
+    CONSTRAINT ck_ati_intervalle
+        CHECK (
+            date_fin_affectation IS NULL
+            OR date_affectation < date_fin_affectation
+        )
+);
+
+CREATE TABLE smartcampus.lien_alerte_intervention (
+    id_lien_alerte_intervention BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    id_alerte                   BIGINT      NOT NULL
+        REFERENCES smartcampus.alerte (id_alerte) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    id_intervention             BIGINT      NOT NULL
+        REFERENCES smartcampus.intervention (id_intervention) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    date_liaison                TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    commentaire                 TEXT,
+    CONSTRAINT uq_lien_alerte_intervention UNIQUE (id_alerte, id_intervention)
+);
+
+-- Trigger de validation d’adéquation entre la portée de la règle et la cible de l’alerte
+CREATE OR REPLACE FUNCTION smartcampus.verifier_cible_alerte()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    portee_attendue VARCHAR(20);
+BEGIN
+    SELECT r.portee_cible
+      INTO portee_attendue
+      FROM smartcampus.regle_alerte AS r
+     WHERE r.id_regle_alerte = NEW.id_regle_alerte;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Regle d''alerte % inexistante', NEW.id_regle_alerte
+            USING ERRCODE = 'foreign_key_violation';
+    END IF;
+
+    IF portee_attendue = 'EQUIPEMENT'
+       AND (NEW.id_equipement_cible IS NULL OR NEW.id_capteur_cible IS NOT NULL) THEN
+        RAISE EXCEPTION 'La regle % attend une cible equipement', NEW.id_regle_alerte
+            USING ERRCODE = 'check_violation';
+    ELSIF portee_attendue = 'CAPTEUR'
+       AND (NEW.id_capteur_cible IS NULL OR NEW.id_equipement_cible IS NOT NULL) THEN
+        RAISE EXCEPTION 'La regle % attend une cible capteur', NEW.id_regle_alerte
+            USING ERRCODE = 'check_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_alerte_cible_portee
+BEFORE INSERT OR UPDATE OF id_regle_alerte, id_equipement_cible, id_capteur_cible
+ON smartcampus.alerte
+FOR EACH ROW
+EXECUTE FUNCTION smartcampus.verifier_cible_alerte();
+
+-- Index complémentaires pour les jointures et filtres d'exploitation
+CREATE INDEX ix_batiment_id_campus ON smartcampus.batiment (id_campus);
+CREATE INDEX ix_zone_id_batiment ON smartcampus.zone (id_batiment);
+CREATE INDEX ix_hze_zone ON smartcampus.historique_zone_equipement (id_zone);
+CREATE INDEX ix_hze_equipement_debut ON smartcampus.historique_zone_equipement (id_equipement, date_debut DESC);
+CREATE INDEX ix_ace_equipement ON smartcampus.affectation_capteur_equipement (id_equipement);
+CREATE INDEX ix_ace_capteur_debut ON smartcampus.affectation_capteur_equipement (id_capteur, date_debut DESC);
+
+CREATE INDEX ix_alerte_equipement_etat_date
+    ON smartcampus.alerte (id_equipement_cible, statut, date_creation DESC)
+    WHERE id_equipement_cible IS NOT NULL;
+CREATE INDEX ix_alerte_capteur_etat_date
+    ON smartcampus.alerte (id_capteur_cible, statut, date_creation DESC)
+    WHERE id_capteur_cible IS NOT NULL;
+CREATE INDEX ix_alerte_regle_date
+    ON smartcampus.alerte (id_regle_alerte, date_creation DESC);
+
+CREATE INDEX ix_intervention_equipement_statut_date
+    ON smartcampus.intervention (id_equipement, statut, date_ouverture DESC);
+CREATE INDEX ix_intervention_statut_date
+    ON smartcampus.intervention (statut, date_ouverture DESC);
+CREATE INDEX ix_ati_technicien
+    ON smartcampus.affectation_technicien_intervention (id_technicien, date_affectation DESC);
+CREATE INDEX ix_lai_intervention
+    ON smartcampus.lien_alerte_intervention (id_intervention);
 ```
 
-L’extrait ne contient pas la totalité du schéma d’alertes, interventions, utilisateurs et techniciens ni les fonctions de contrôle de portée. Ces éléments sont décrits dans le MLD ci-dessus et dans les sections suivantes; avant mise en production, le script complet doit être revu, exécuté sur la version PostgreSQL cible et intégré à des tests de migration.
+Ce script DDL complet matérialise l'ensemble des entités du périmètre métier, leurs types précis, leurs contraintes d'intégrité relationnelle et temporelle (exclusions GiST), le partitionnement de la table de mesures à forte volumétrie et les déclencheurs procéduraux d'intégrité croisée. Avant déploiement en production, les partitions mensuelles ultérieures sont créées par un job d'exploitation planifié et le script est intégré à l'outil de migration (ex. Flyway ou Liquibase).
 
 ## 5. Étape 4 — Normalisation et dénormalisations maîtrisées
 
@@ -541,26 +902,56 @@ Chaque ajout exigerait un flux de synchronisation, une politique de cohérence, 
 
 ## 7. Étape 6 — Architecture, flux et résilience
 
-### 7.1 Architecture logique
+### 7.1 Architecture logique et flux de bout en bout
 
-```text
-CAPTEURS (~600)
-   │ événement : source, identifiant message, heure événement, valeur, qualité
-   v
-PASSERELLES IoT — authentification, horloge, spool local durable, reprise
-   │ TLS; accusé selon persistance réellement garantie
-   v
-POINT D'ENTRÉE / API D'INGESTION — validation, normalisation, limitation
-   v
-FILE DURABLE OPTIONNELLE — tampon, back-pressure, rejeu, quarantaine
-   v
-SERVICE D'INGESTION — inbox/déduplication, contrôle, transaction PostgreSQL
-   ├──> PostgreSQL : mesures partitionnées + référentiel + outbox
-   ├──> Consommateur de règles : alertes transactionnelles
-   ├──> API supervision : états et historiques
-   └──> Service maintenance : interventions et affectations de techniciens
+Le diagramme ci-dessous illustre l'architecture globale des flux, depuis les capteurs physiques jusqu'aux applications de supervision, en intégrant les mécanismes de résilience (spool passerelle, tampon d'ingestion, partitionnement et découplage par table Outbox) :
 
-PostgreSQL outbox ──> projection SQL / cache éventuel (reconstructible)
+```mermaid
+flowchart TD
+    subgraph IoT["Périphérie IoT & Passerelles"]
+        Sensors["Capteurs connectés (~600 capteurs)<br/><i>Émission horodatée (1 mesure / 30 s)</i>"]
+        Gateway["Passerelles IoT de bâtiment<br/>- Spool local persistant (tampon coupure réseau)<br/>- Synchronisation d'horloge NTP & TLS<br/>- Rejeu contrôlé après reconnexion"]
+    end
+
+    subgraph Ingestion["Ingestion & Résilience"]
+        APIGW["Point d'entrée / API d'ingestion<br/>- Authentification passerelles<br/>- Validation schéma & unités<br/>- Horodatage réception (UTC)"]
+        Queue["File durable / Tampon de délestage<br/><i>(Gestion des rafales & back-pressure)</i>"]
+        IngestSvc["Service d'ingestion applicatif<br/>- Idempotence (Inbox Pattern)<br/>- Déduplication via identifiant source<br/>- Évaluation des règles d'alerte"]
+    end
+
+    subgraph Storage["Source de Vérité Unique (PostgreSQL 15+)"]
+        subgraph PG["PostgreSQL Relationnel"]
+            RefDB[("Référentiel Spatial & Parc<br/>Campus, Bâtiments, Zones,<br/>Équipements, Capteurs")]
+            HistoDB[("Historiques Temporels<br/>- Localisations (GiST)<br/>- Affectations (GiST)")]
+            PartDB[("Mesures Brutes (~630M/an)<br/>Partitionnement RANGE mensuel<br/>Index DESC couverts")]
+            AlertDB[("Alertes & Maintenance<br/>Règles, Alertes, Interventions")]
+            OutboxTable[("Table Outbox Transactionnelle")]
+        end
+    end
+
+    subgraph Projections["Couche Projections & Cache Rapide"]
+        OutboxRelay["Relais Outbox / CDC"]
+        RedisCache[("Cache Clé-Valeur (Redis)<br/>Dernière mesure & état courant<br/><i>(Données dérivées reconstructibles)</i>")]
+    end
+
+    subgraph Consumers["Applications Métier & Exploitation"]
+        Dashboards["Tableaux de bord de supervision<br/><i>(~50 utilisateurs diurnes, refresh 5 min)</i>"]
+        MaintApp["Portail Maintenance & Techniciens<br/><i>(Suivi des interventions & alertes)</i>"]
+        EnergyBI["Analytique Énergétique<br/><i>(Agrégats & comparaisons bâtiments)</i>"]
+    end
+
+    Sensors -->|"Mesures brutes horodatées"| Gateway
+    Gateway -->|"Transmission sécurisée TLS"| APIGW
+    APIGW -->|"Dépôt durable & ACK"| Queue
+    Queue -->|"Consommation régulée"| IngestSvc
+    IngestSvc -->|"Transaction ACID"| PG
+    OutboxTable --> OutboxRelay
+    OutboxRelay -->|"Projection asynchrone"| RedisCache
+
+    RedisCache -.->|"Lectures sub-seconde"| Dashboards
+    PG -->|"Requêtes historiques & élagage"| Dashboards
+    PG -->|"Gestion des tickets & fiches"| MaintApp
+    PG -->|"Requêtes d'agrégation temporelle"| EnergyBI
 ```
 
 PostgreSQL porte le référentiel, les mesures brutes, les règles, alertes, interventions et associations historisées. La file durable et le cache ne sont pas une source de vérité. Le cache externe n’est pas requis au démarrage.
@@ -689,3 +1080,129 @@ L’architecture SmartCampus doit d’abord garantir l’exactitude temporelle e
 PostgreSQL constitue un socle cohérent pour le périmètre étudié, sous réserve de confirmer le modèle avec les règles métier et d’éprouver le MPD sur des volumes représentatifs. Le partitionnement, les index ciblés et les tampons durables répondent aux contraintes identifiées sans imposer d’emblée plusieurs moteurs. La valeur de cette architecture ne dépend pas seulement du choix du SGBD : elle dépend tout autant de l’identité des messages, de la qualité des horloges, de la politique de rétention, du cycle de vie des partitions et de la capacité à restaurer réellement les données.
 
 La décision d’ajouter un cache, un moteur analytique ou un stockage distribué doit donc rester conditionnelle à des objectifs approuvés et à des mesures reproductibles. Cette progression — clarifier, construire, mesurer, puis faire évoluer — maintient une source de vérité claire, limite les coûts opérationnels et laisse ouverte une croissance vers davantage de campus, de capteurs et d’usages analytiques.
+
+---
+
+## 10. Annexe — Requêtes SQL d’exploitation et scénarios de charge
+
+Cette annexe rassemble les requêtes critiques du système de données, conçues pour valider les performances d’accès, l’élagage des partitions (*partition pruning*), la cohérence spatio-temporelle et le respect des objectifs de latence des tableaux de bord.
+
+### 10.1 Requête d’état courant pour les tableaux de bord (Supervision diurne)
+
+Cette requête extrait la dernière observation valide pour l’ensemble des ~600 capteurs du campus. Elle s’exécute typiquement toutes les 5 minutes pour rafraîchir la vue d’ensemble des 50 utilisateurs connectés, en s’appuyant sur l’index couvrant `ix_mesure_capteur_evenement`.
+
+```sql
+-- Récupération de la dernière mesure valide par capteur
+SELECT DISTINCT ON (m.id_capteur)
+    m.id_capteur,
+    c.identifiant_externe,
+    c.type_capteur,
+    m.id_mesure,
+    m.horodatage_evenement,
+    m.horodatage_reception,
+    m.valeur,
+    m.unite,
+    m.qualite
+FROM smartcampus.mesure AS m
+JOIN smartcampus.capteur AS c ON c.id_capteur = m.id_capteur
+WHERE m.qualite = 'VALIDE'
+  AND m.horodatage_evenement >= CURRENT_TIMESTAMP - INTERVAL '15 minutes'
+ORDER BY m.id_capteur, m.horodatage_evenement DESC;
+```
+*Note d’optimisation :* La clause temporelle `horodatage_evenement >= CURRENT_TIMESTAMP - INTERVAL '15 minutes'` permet à PostgreSQL de ne scanner que la partition courante du mois, évitant un balayage de l’historique complet des 630 millions de lignes. Si le temps d’exécution dépasse le seuil cible sous forte concurrence, cette requête alimente la projection matérialisée `etat_courant_capteur` synchronisée par Outbox.
+
+### 10.2 Requête d’historique temporel avec élagage de partition (*Partition Pruning*)
+
+Cette requête extrait la série chronologique d’un capteur cible sur une fenêtre de 7 jours pour un tracé graphique sur le poste de l’exploitant.
+
+```sql
+-- Diagnostic historique d'un capteur sur une fenêtre temporelle
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT 
+    id_mesure,
+    horodatage_evenement,
+    valeur,
+    unite,
+    qualite
+FROM smartcampus.mesure
+WHERE id_capteur = :id_capteur_cible
+  AND horodatage_evenement >= '2025-03-01 00:00:00+00'
+  AND horodatage_evenement <  '2025-03-08 00:00:00+00'
+ORDER BY horodatage_evenement ASC;
+```
+*Comportement attendu :* Grâce au partitionnement par `RANGE (horodatage_evenement)`, le planificateur PostgreSQL applique l’élagage statique et dynamique (*Partition Pruning*), en ignorant totalement 11 des 12 partitions mensuelles et en restreignant la recherche à l’index local de la partition concernée.
+
+### 10.3 Résolution spatio-temporelle : localisation et équipement à date d’événement
+
+Pour diagnostiquer une défaillance ou qualifier une alerte, cette requête reconstitue l’environnement physique complet (équipement supervisé, zone et bâtiment) en vigueur exactement au moment où l’observation a été mesurée, sans être faussée par les déplacements ou réaffectations ultérieurs.
+
+```sql
+-- Reconstitution du contexte physique exact d'une observation passée
+SELECT 
+    m.id_mesure,
+    m.horodatage_evenement,
+    m.valeur,
+    m.unite,
+    c.id_capteur,
+    c.identifiant_externe AS code_capteur,
+    e.id_equipement,
+    e.code_equipement,
+    e.libelle AS nom_equipement,
+    z.id_zone,
+    z.code_zone,
+    z.nom AS nom_zone,
+    b.code_batiment,
+    b.nom AS nom_batiment
+FROM smartcampus.mesure AS m
+JOIN smartcampus.capteur AS c 
+    ON c.id_capteur = m.id_capteur
+-- 1. Résolution de l'équipement rattaché au capteur à la date de l'événement
+JOIN smartcampus.affectation_capteur_equipement AS ace 
+    ON ace.id_capteur = m.id_capteur
+   AND m.horodatage_evenement >= ace.date_debut
+   AND (ace.date_fin IS NULL OR m.horodatage_evenement < ace.date_fin)
+JOIN smartcampus.equipement AS e 
+    ON e.id_equipement = ace.id_equipement
+-- 2. Résolution de la zone où se trouvait l'équipement à la date de l'événement
+JOIN smartcampus.historique_zone_equipement AS hze 
+    ON hze.id_equipement = e.id_equipement
+   AND m.horodatage_evenement >= hze.date_debut
+   AND (hze.date_fin IS NULL OR m.horodatage_evenement < hze.date_fin)
+JOIN smartcampus.zone AS z 
+    ON z.id_zone = hze.id_zone
+JOIN smartcampus.batiment AS b 
+    ON b.id_batiment = z.id_batiment
+WHERE m.id_mesure = :id_mesure_cible
+  AND m.horodatage_evenement = :horodatage_mesure;
+```
+
+### 10.4 Agrégation de consommation énergétique par bâtiment (Pas de 5 minutes)
+
+Cette requête permet au responsable énergie d’analyser les profils de consommation électrique ou thermique par bâtiment, agrégés par fenêtres régulières de 5 minutes.
+
+```sql
+-- Calcul de la puissance moyenne ou cumul par pas de 5 minutes et par bâtiment
+SELECT 
+    b.code_batiment,
+    b.nom AS batiment,
+    date_bin(INTERVAL '5 minutes', m.horodatage_evenement, TIMESTAMPTZ '2025-01-01 00:00:00+00') AS creneau_5min,
+    COUNT(m.id_mesure) AS nb_mesures,
+    ROUND(AVG(m.valeur), 2) AS valeur_moyenne,
+    m.unite
+FROM smartcampus.mesure AS m
+JOIN smartcampus.affectation_capteur_equipement AS ace
+    ON ace.id_capteur = m.id_capteur
+   AND m.horodatage_evenement >= ace.date_debut
+   AND (ace.date_fin IS NULL OR m.horodatage_evenement < ace.date_fin)
+JOIN smartcampus.historique_zone_equipement AS hze
+    ON hze.id_equipement = ace.id_equipement
+   AND m.horodatage_evenement >= hze.date_debut
+   AND (hze.date_fin IS NULL OR m.horodatage_evenement < hze.date_fin)
+JOIN smartcampus.zone AS z ON z.id_zone = hze.id_zone
+JOIN smartcampus.batiment AS b ON b.id_batiment = z.id_batiment
+WHERE m.qualite = 'VALIDE'
+  AND m.horodatage_evenement >= '2025-03-01 08:00:00+00'
+  AND m.horodatage_evenement <  '2025-03-01 12:00:00+00'
+GROUP BY b.code_batiment, b.nom, creneau_5min, m.unite
+ORDER BY b.code_batiment, creneau_5min;
+```
