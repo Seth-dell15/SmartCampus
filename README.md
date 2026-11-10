@@ -14,6 +14,7 @@ Les valeurs de dimensionnement sont des hypothèses de travail tirées du cas, e
 
 - [Cas pratique SmartCampus](./sources/cas-pratique-smartcampus.pdf) — contexte fonctionnel et dimensionnement du cas.
 - [Sujet du TD 1](./sources/td/td1-du-cahier-des-charges-au-mcd.pdf) — consignes pédagogiques de modélisation.
+- [Sujet du TD 2](./sources/td/TD%202%20%E2%80%93%20Du%20MCD%20au%20MLD%20_%20MPD%20SQL.docx.pdf) — consignes de traduction du MCD vers le MLD et le MPD SQL.
 
 Les originaux des PDF sont conservés dans le dossier parent `Exo`; les copies organisées du projet sont dans `sources/`.
 
@@ -22,6 +23,7 @@ Les originaux des PDF sont conservés dans le dossier parent `Exo`; les copies o
 #### Dossier final
 
 - [Dossier final de synthèse — architecture de données, modélisation et résilience IoT](./livrables/synthese-finale-smartcampus.md) — consolidation des huit étapes, du contexte métier aux recommandations, sans résultats de benchmark inventés.
+- [TD 2 — Du MCD au MLD / MPD SQL](./livrables/td2/td2-du-mcd-au-mld-mpd-sql.md) — schéma relationnel, types PostgreSQL, contraintes, index, requêtes métier et tests d’intégrité.
 
 | Ordre | Livrable | Contenu |
 |---:|---|---|
