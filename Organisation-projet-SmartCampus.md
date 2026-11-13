@@ -4,7 +4,7 @@
 
 Le dépôt sépare les sujets et documents de référence, les rendus des travaux dirigés et les documents du projet transverse. Cette organisation facilite la navigation et distingue clairement les consignes des productions.
 
-**État appliqué :** les PDF de référence sont dans `sujets/`, les quatre rendus de TD dans `tds/`, et les huit étapes ainsi que la synthèse dans `projet/`. Le README et le présent document restent à la racine.
+**État appliqué :** les PDF de référence sont dans `sujets/`, les cinq rendus de TD dans `tds/`, et les huit étapes ainsi que la synthèse dans `projet/`. Le README et le présent document restent à la racine.
 
 ## 2. Arborescence appliquée
 
@@ -19,13 +19,16 @@ SmartCampus/
 │       ├── td1-du-cahier-des-charges-au-mcd.pdf
 │       ├── TD 2 – Du MCD au MLD _ MPD SQL.docx.pdf
 │       ├── TD 3 – Normaliser ou dénormaliser.pdf
-│       └── TD 4 – Paradigmes NoSQL et benchmark.pdf
+│       ├── TD 4 – Paradigmes NoSQL et benchmark.pdf
+│       └── TD 5 – Architecture polyglotte et défense.docx.pdf
 │
 ├── tds/
 │   ├── td1-du-cahier-des-charges-au-mcd.md
 │   ├── td2-du-mld-mpd-sql.md
 │   ├── td3-arbitrage-normalisation-denormalisation.md
-│   └── td4-nosql-paradigmes-dataset-benchmark.md
+│   ├── td4-nosql-paradigmes-dataset-benchmark.md
+│   ├── td5.md
+│   └── smartcampus-projet-complet.md
 │
 └── projet/
     ├── etapes/
@@ -38,14 +41,15 @@ SmartCampus/
     │   ├── 07-benchmark.md
     │   └── 08-recommandations.md
     ├── synthese-finale-smartcampus.md
-    └── synthese-finale-smartcampus.pdf
+    ├── synthese-finale-smartcampus.pdf
+    └── smartcampus-projet-final.md
 ```
 
 ## 3. Rôle des dossiers
 
 - **`sujets/`** contient les copies des consignes pédagogiques et du cas pratique. Les originaux PDF sont conservés dans le dossier parent `Exo`.
-- **`tds/`** regroupe les rendus finalisés des TD 1 à 4, à plat pour un accès direct.
-- **`projet/`** rassemble les huit étapes de conception sous `etapes/` et la synthèse finale aux formats Markdown et PDF.
+- **`tds/`** regroupe les rendus finalisés des TD 1 à 5 et leur compilation intégrale, à plat pour un accès direct.
+- **`projet/`** rassemble les huit étapes de conception sous `etapes/` et les dossiers de synthèse du projet.
 - **`README.md`** est le point d’entrée du dépôt : il présente le projet, les choix d’architecture et les liens vers les documents.
 - **`Organisation-projet-SmartCampus.md`** décrit l’arborescence et les conventions de classement.
 
