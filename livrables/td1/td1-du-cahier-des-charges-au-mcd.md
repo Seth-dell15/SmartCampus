@@ -253,6 +253,182 @@ Alerte (0,N) ── Lien_Alerte_Intervention ── (0,N) Intervention
 
 Les deux associations historisées sont détaillées à l’étape suivante. Les associations `Affectation_Technicien_Intervention` et `Lien_Alerte_Intervention` deviennent également des entités-associations, car elles portent des attributs et/ou une traçabilité.
 
+### 3.6 Représentation graphique du MCD (Mermaid)
+
+Le diagramme représente les entités métier et les entités-associations porteuses d’attributs ou d’historique. Chaque occurrence d’une entité-association relie exactement une occurrence de chacune de ses entités parentes.
+
+```mermaid
+erDiagram
+    CAMPUS ||--|{ BATIMENT : regroupe
+    BATIMENT ||--|{ ZONE : contient
+
+    EQUIPEMENT ||--o{ HISTORIQUE_ZONE_EQUIPEMENT : localisation
+    ZONE ||--o{ HISTORIQUE_ZONE_EQUIPEMENT : accueille
+
+    CAPTEUR ||--o{ AFFECTATION_CAPTEUR_EQUIPEMENT : affectation
+    EQUIPEMENT ||--o{ AFFECTATION_CAPTEUR_EQUIPEMENT : equipe
+
+    CAPTEUR ||--o{ MESURE : produit
+
+    REGLE_ALERTE ||--o{ ALERTE : declenche
+    EQUIPEMENT o|--o{ ALERTE : cible_equipement
+    CAPTEUR o|--o{ ALERTE : cible_capteur
+    MESURE o|--o{ ALERTE : mesure_declencheuse
+
+    EQUIPEMENT ||--o{ INTERVENTION : concerne
+    UTILISATEUR o|--o{ INTERVENTION : demandeur
+    UTILISATEUR ||--o| TECHNICIEN : profil
+
+    TECHNICIEN ||--o{ AFFECTATION_TECHNICIEN_INTERVENTION : participe
+    INTERVENTION ||--o{ AFFECTATION_TECHNICIEN_INTERVENTION : mobilise
+
+    ALERTE ||--o{ LIEN_ALERTE_INTERVENTION : associe
+    INTERVENTION ||--o{ LIEN_ALERTE_INTERVENTION : associe
+
+    CAMPUS {
+        string id_campus PK
+        string code_campus
+        string nom
+        string adresse
+        string statut
+    }
+
+    BATIMENT {
+        string id_batiment PK
+        string code_batiment
+        string nom
+        string adresse
+        float superficie_m2
+        string statut
+    }
+
+    ZONE {
+        string id_zone PK
+        string code_zone
+        string nom
+        string type_zone
+        string etage
+        string statut
+    }
+
+    EQUIPEMENT {
+        string id_equipement PK
+        string code_equipement
+        string libelle
+        string type_equipement
+        string marque
+        string reference_constructeur
+        string numero_serie
+        date date_mise_en_service
+        string statut
+    }
+
+    HISTORIQUE_ZONE_EQUIPEMENT {
+        string id_historique_zone PK
+        datetime date_debut
+        datetime date_fin
+        string motif_deplacement
+    }
+
+    CAPTEUR {
+        string id_capteur PK
+        string identifiant_externe
+        string type_capteur
+        string libelle
+        string unite_nominale
+        date date_mise_en_service
+        string statut
+    }
+
+    AFFECTATION_CAPTEUR_EQUIPEMENT {
+        string id_affectation_capteur PK
+        datetime date_debut
+        datetime date_fin
+        string motif_affectation
+    }
+
+    MESURE {
+        string id_mesure PK
+        float valeur
+        string unite
+        datetime horodatage_evenement
+        datetime horodatage_reception
+        string qualite
+        string cle_deduplication
+    }
+
+    REGLE_ALERTE {
+        string id_regle_alerte PK
+        string code_regle
+        int numero_version
+        string libelle
+        string portee_cible
+        string indicateur
+        string operateur
+        float seuil
+        string severite
+        datetime date_debut_validite
+        datetime date_fin_validite
+        string statut
+    }
+
+    ALERTE {
+        string id_alerte PK
+        datetime date_creation
+        string severite_constatee
+        string statut
+        datetime date_acquittement
+        datetime date_cloture
+        string commentaire
+    }
+
+    INTERVENTION {
+        string id_intervention PK
+        string reference
+        string type_intervention
+        string priorite
+        string statut
+        datetime date_ouverture
+        datetime date_planifiee
+        datetime date_debut
+        datetime date_cloture
+        string description
+        string compte_rendu
+    }
+
+    TECHNICIEN {
+        string id_technicien PK
+        string matricule
+        string specialite
+        string statut
+    }
+
+    UTILISATEUR {
+        string id_utilisateur PK
+        string courriel
+        string prenom
+        string nom
+        string statut
+        datetime date_creation
+    }
+
+    AFFECTATION_TECHNICIEN_INTERVENTION {
+        string id_affectation_technicien PK
+        datetime date_affectation
+        datetime date_fin_affectation
+        string role_dans_intervention
+        string commentaire
+    }
+
+    LIEN_ALERTE_INTERVENTION {
+        string id_lien_alerte_intervention PK
+        datetime date_liaison
+        string commentaire
+    }
+```
+
+Les cardinalités des liens de cible d’`ALERTE` indiquent qu’une alerte peut concerner au plus un équipement et au plus un capteur; la règle métier impose qu’elle concerne exactement l’un des deux (XOR). Les contraintes d’exclusion mutuelle, dont ce XOR, ainsi que la gestion des intervalles temporels semi-ouverts `[date_debut, date_fin[` des associations historisées ne sont pas représentées complètement par le diagramme. Elles sont précisées dans les règles textuelles associées et seront traduites au niveau logique et physique.
+
 ## Étape 4 — Traitement des données historiques
 
 ### 4.1 Cas 1 : historique de localisation des équipements

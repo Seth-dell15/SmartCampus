@@ -19,14 +19,18 @@ SmartCampus/
 │   └── td/
 │       ├── td1-du-cahier-des-charges-au-mcd.pdf
 │       │   └── Sujet et consignes pédagogiques du TD 1
-│       └── TD 2 – Du MCD au MLD _ MPD SQL.docx.pdf
-│           └── Sujet et consignes pédagogiques du TD 2
+│       ├── TD 2 – Du MCD au MLD _ MPD SQL.docx.pdf
+│       │   └── Sujet et consignes pédagogiques du TD 2
+│       └── TD 3 – Normaliser ou dénormaliser.pdf
+│           └── Sujet et consignes pédagogiques du TD 3
 │
 ├── livrables/
 │   ├── td1/
 │   │   └── td1-du-cahier-des-charges-au-mcd.md
 │   ├── td2/
 │   │   └── td2-du-mcd-au-mld-mpd-sql.md
+│   ├── td3/
+│   │   └── td3-arbitrage-normalisation-denormalisation.md
 │   └── etapes/
 │       ├── 01-analyse-metier-et-dimensionnement.md
 │       ├── 02-mcd.md
@@ -73,12 +77,13 @@ Les fichiers PDF présents à la racine de `SmartCampus` ont été comparés aux
 | `TD 1 – Du cahier des charges au MCD.docx.pdf` | `sources/td/td1-du-cahier-des-charges-au-mcd.pdf` | Copie du projet déplacée et renommée; original parent conservé. |
 | `TD 2 – Du MCD au MLD _ MPD SQL.docx.pdf` | `sources/td/TD 2 – Du MCD au MLD _ MPD SQL.docx.pdf` | Sujet conservé dans son nom d’origine. |
 
-### 3.2 Dix livrables Markdown classés
+### 3.2 Onze livrables Markdown classés
 
 | Nom avant déplacement (racine) | Destination appliquée |
 |---|---|
 | `TD1-Du-cahier-des-charges-au-MCD-SmartCampus.md` | `livrables/td1/td1-du-cahier-des-charges-au-mcd.md` |
 | `TD 2 — Du MCD au MLD / MPD SQL` | `livrables/td2/td2-du-mcd-au-mld-mpd-sql.md` |
+| Livrable TD 3 — Arbitrage normalisation / dénormalisation | `livrables/td3/td3-arbitrage-normalisation-denormalisation.md` |
 | `Analyse-etape-1-SmartCampus.md` | `livrables/etapes/01-analyse-metier-et-dimensionnement.md` |
 | `MCD-etape-2-SmartCampus.md` | `livrables/etapes/02-mcd.md` |
 | `MLD-MPD-etape-3-SmartCampus.md` | `livrables/etapes/03-mld-mpd.md` |
@@ -92,14 +97,14 @@ Les fichiers PDF présents à la racine de `SmartCampus` ont été comparés aux
 
 1. Les répertoires `sources/`, `livrables/` et `travail/` ainsi que leurs sous-dossiers ont été créés.
 2. Les PDF du cas pratique et du TD 1 ont été comparés aux originaux du dossier parent par SHA-256; les copies du projet ont été déplacées et renommées, sans supprimer les originaux parentaux. Le PDF du TD 2 a été ajouté sous son nom d’origine.
-3. Les TD 1 et 2 ainsi que les étapes 1 à 8 ont été classés dans `livrables/`.
+3. Les TD 1, 2 et 3 ainsi que les étapes 1 à 8 ont été classés dans `livrables/`.
 4. Les liens du README ont été mis à jour vers les nouveaux chemins et contrôlés.
 5. Vérifier les liens externes ou favoris qui pourraient encore utiliser les anciens chemins.
 6. Si le projet est placé sous Git, examiner les changements et valider le déplacement/renommage dans le dépôt selon le processus de versionnement du projet.
 
 ## 4. Contenu du README racine
 
-Le [README.md](./README.md) présente le projet, les choix d’architecture et donne accès aux sources et livrables via leurs chemins désormais organisés. Il recense les TD 1 et 2, les étapes 1 à 8 et le dossier final de synthèse.
+Le [README.md](./README.md) présente le projet, les choix d’architecture et donne accès aux sources et livrables via leurs chemins désormais organisés. Il recense les TD 1 à 3, les étapes 1 à 8 et le dossier final de synthèse.
 
 ## 5. Règles de nommage et de version
 

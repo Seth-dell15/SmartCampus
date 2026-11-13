@@ -437,6 +437,79 @@ L’agrégat étant spatial et historique, des agrégats matérialisés ne sont 
 
 Les PK et contraintes `UNIQUE` créent déjà leurs index B-tree : ne pas les dupliquer. Les FK seules ne créent pas automatiquement un index côté enfant dans PostgreSQL. Indexer les FK lorsque les jointures, recherches entrantes ou opérations référentielles le justifient. Chaque index secondaire consomme du stockage et ralentit les insertions IoT; mesurer avant d’ajouter des index partiels ou couvrants supplémentaires.
 
+### Analyse du plan d’exécution
+
+L’extrait ci-dessous illustre l’analyse de la Requête 5 sur une base peuplée. Les valeurs de bâtiment et de période sont concrètes pour rendre la requête exécutable; la période correspond à la partition d’exemple `mesure_2026_01` créée dans l’annexe. Il s’agit d’un plan **schématique, non mesuré** : le plan exact et ses coûts dépendent du volume, des statistiques, de la sélectivité et de la configuration PostgreSQL.
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT date_trunc(
+           'month',
+           m.horodatage_evenement AT TIME ZONE 'UTC'
+       )::date AS mois_utc,
+       SUM(m.valeur) AS consommation_kwh
+FROM smartcampus.mesure AS m
+JOIN smartcampus.affectation_capteur_equipement AS ace
+  ON ace.id_capteur = m.id_capteur
+ AND ace.date_debut <= m.horodatage_evenement
+ AND (ace.date_fin IS NULL OR m.horodatage_evenement < ace.date_fin)
+JOIN smartcampus.historique_zone_equipement AS h
+  ON h.id_equipement = ace.id_equipement
+ AND h.date_debut <= m.horodatage_evenement
+ AND (h.date_fin IS NULL OR m.horodatage_evenement < h.date_fin)
+JOIN smartcampus.zone AS z
+  ON z.id_zone = h.id_zone
+WHERE z.id_batiment = 42
+  AND m.horodatage_evenement >= TIMESTAMPTZ '2026-01-01 00:00:00+00'
+  AND m.horodatage_evenement <  TIMESTAMPTZ '2026-02-01 00:00:00+00'
+  AND m.qualite = 'VALIDE'
+  AND m.unite = 'kWh'
+GROUP BY date_trunc(
+             'month',
+             m.horodatage_evenement AT TIME ZONE 'UTC'
+         )::date
+ORDER BY mois_utc;
+```
+
+Une forme de plan possible, lorsque le planificateur commence par les mesures de la partition mensuelle et que les index des associations sont utilisables, est :
+
+```text
+GroupAggregate
+  Group Key: date_trunc('month', ...)
+  -> Sort
+       Sort Key: date_trunc('month', ...)
+       -> Nested Loop
+            -> Nested Loop
+                 -> Nested Loop
+                      -> Seq Scan on mesure_2026_01 m
+                           Filter: (horodatage_evenement >= début
+                                    AND horodatage_evenement < fin
+                                    AND qualite = 'VALIDE'
+                                    AND unite = 'kWh')
+                      -> Index Scan using ix_ace_capteur_debut
+                           on affectation_capteur_equipement ace
+                           Index Cond:
+                             (id_capteur = m.id_capteur
+                              AND date_debut <= m.horodatage_evenement)
+                           Filter: (date_fin IS NULL
+                                    OR m.horodatage_evenement < date_fin)
+                 -> Index Scan using ix_hze_equipement_debut
+                      on historique_zone_equipement h
+                      Index Cond:
+                        (id_equipement = ace.id_equipement
+                         AND date_debut <= m.horodatage_evenement)
+                      Filter: (date_fin IS NULL
+                               OR m.horodatage_evenement < date_fin)
+            -> Index Scan using pk_zone
+                 on zone z
+                 Index Cond: (id_zone = h.id_zone)
+                 Filter: (id_batiment = 42)
+```
+
+Le détail peut aussi comporter des parcours indexés de `zone` et `historique_zone_equipement`, ou choisir un parcours séquentiel de la partition si une grande partie de ses lignes est requise. Avec les bornes temporelles constantes de cet exemple, l’élagage a lieu à la planification : seule `mesure_2026_01` apparaît dans le plan; les partitions des autres mois sont absentes. Avec un plan générique paramétré, l’élagage peut plutôt être réalisé à l’exécution et signalé par `Subplans Removed` sous un nœud `Append`.
+
+Dans le plan illustré, le balayage séquentiel d’une seule partition peut être plus efficace que l’index de mesures si une grande fraction de ce mois est lue. Si le planificateur part plutôt de la liste des capteurs rattachés au bâtiment, l’index composite `(id_capteur, horodatage_evenement DESC)` peut servir à rechercher leurs mesures dans la fenêtre et couvrir des colonnes grâce à `INCLUDE`. Les index composites des affectations et historiques aident à résoudre les liens temporels. Le partitionnement réduit l’ensemble de données à parcourir, mais ne garantit pas à lui seul l’emploi d’un index : `EXPLAIN (ANALYZE, BUFFERS)` doit être exécuté sur des données représentatives, avec des statistiques à jour, pour confirmer les choix du planificateur et les lectures réellement effectuées.
+
 ## Étape 5 — Contrôler les anomalies (tests d’intégrité)
 
 Les résultats ci-dessous découlent du DDL PostgreSQL de référence. PostgreSQL fournit un SQLSTATE stable, mais le texte complet du message varie selon la version, le nom de contrainte et la langue du serveur; les textes cités sont les formes attendues en anglais (`lc_messages` par défaut), accompagnées du SQLSTATE.
@@ -454,3 +527,225 @@ Pour vérifier également les intervalles simultanés, deux localisations qui se
 ## Conclusion
 
 Le passage au MLD conserve les cardinalités et les associations historisées du MCD; le MPD traduit ces règles par des FK, `NOT NULL`, `UNIQUE`, `CHECK` et contraintes d’exclusion. Les index sont alignés sur les cinq lectures demandées et sur la résolution de l’emplacement historique au moment de la mesure. Le principal point fonctionnel restant à arbitrer pour les consommations est la sémantique du signal énergétique (delta ou compteur cumulatif) et ses unités de calcul.
+
+## Annexe A — Script SQL DDL complet
+
+Le script suivant matérialise les principales tables du référentiel, les deux associations temporelles et la table de mesures partitionnée. Il cible PostgreSQL 15+. Les partitions présentées sont des exemples mensuels; un traitement d’exploitation doit créer à l’avance les partitions nécessaires aux périodes d’ingestion et de consultation.
+
+```sql
+BEGIN;
+
+CREATE SCHEMA IF NOT EXISTS smartcampus;
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+CREATE TABLE smartcampus.campus (
+    id_campus BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    code_campus VARCHAR(80) NOT NULL,
+    nom VARCHAR(160) NOT NULL,
+    adresse VARCHAR(500),
+    statut VARCHAR(30) NOT NULL,
+
+    CONSTRAINT pk_campus PRIMARY KEY (id_campus),
+    CONSTRAINT uq_campus_code UNIQUE (code_campus),
+    CONSTRAINT ck_campus_statut
+        CHECK (statut IN ('ACTIF', 'INACTIF', 'ARCHIVE'))
+);
+
+CREATE TABLE smartcampus.batiment (
+    id_batiment BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    id_campus BIGINT NOT NULL,
+    code_batiment VARCHAR(80) NOT NULL,
+    nom VARCHAR(160) NOT NULL,
+    adresse VARCHAR(500),
+    statut VARCHAR(30) NOT NULL,
+
+    CONSTRAINT pk_batiment PRIMARY KEY (id_batiment),
+    CONSTRAINT uq_batiment_code UNIQUE (code_batiment),
+    CONSTRAINT fk_batiment_campus
+        FOREIGN KEY (id_campus)
+        REFERENCES smartcampus.campus (id_campus)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT ck_batiment_statut
+        CHECK (statut IN ('ACTIF', 'INACTIF', 'ARCHIVE'))
+);
+
+CREATE TABLE smartcampus.zone (
+    id_zone BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    id_batiment BIGINT NOT NULL,
+    code_zone VARCHAR(80) NOT NULL,
+    nom VARCHAR(160) NOT NULL,
+    type_zone VARCHAR(50) NOT NULL,
+    etage VARCHAR(40),
+    statut VARCHAR(30) NOT NULL,
+
+    CONSTRAINT pk_zone PRIMARY KEY (id_zone),
+    CONSTRAINT fk_zone_batiment
+        FOREIGN KEY (id_batiment)
+        REFERENCES smartcampus.batiment (id_batiment)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT uq_zone_code_batiment UNIQUE (id_batiment, code_zone),
+    CONSTRAINT ck_zone_statut
+        CHECK (statut IN ('ACTIVE', 'FERMEE', 'ARCHIVEE'))
+);
+
+CREATE TABLE smartcampus.equipement (
+    id_equipement BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    code_equipement VARCHAR(100) NOT NULL,
+    libelle VARCHAR(200) NOT NULL,
+    type_equipement VARCHAR(80) NOT NULL,
+    marque VARCHAR(100),
+    reference_constructeur VARCHAR(120),
+    modele VARCHAR(100),
+    numero_serie VARCHAR(120),
+    date_mise_en_service DATE,
+    statut VARCHAR(30) NOT NULL,
+
+    CONSTRAINT pk_equipement PRIMARY KEY (id_equipement),
+    CONSTRAINT uq_equipement_code UNIQUE (code_equipement),
+    CONSTRAINT ck_equipement_statut
+        CHECK (statut IN (
+            'EN_PREPARATION', 'EN_SERVICE', 'HORS_SERVICE',
+            'RETIRE', 'ARCHIVE'
+        ))
+);
+
+-- Localisation historisée; les bornes sont semi-ouvertes : [début, fin).
+CREATE TABLE smartcampus.historique_zone_equipement (
+    id_historique_zone BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    id_equipement BIGINT NOT NULL,
+    id_zone BIGINT NOT NULL,
+    date_debut TIMESTAMPTZ NOT NULL,
+    date_fin TIMESTAMPTZ,
+    motif_deplacement VARCHAR(500),
+
+    CONSTRAINT pk_historique_zone_equipement
+        PRIMARY KEY (id_historique_zone),
+    CONSTRAINT fk_hze_equipement
+        FOREIGN KEY (id_equipement)
+        REFERENCES smartcampus.equipement (id_equipement)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT fk_hze_zone
+        FOREIGN KEY (id_zone)
+        REFERENCES smartcampus.zone (id_zone)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT ck_hze_intervalle
+        CHECK (date_fin IS NULL OR date_debut < date_fin),
+    CONSTRAINT ex_hze_equipement_periode
+        EXCLUDE USING gist (
+            id_equipement WITH =,
+            tstzrange(date_debut, date_fin, '[)') WITH &&
+        )
+);
+
+CREATE TABLE smartcampus.capteur (
+    id_capteur BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    identifiant_externe VARCHAR(160) NOT NULL,
+    type_capteur VARCHAR(80) NOT NULL,
+    libelle VARCHAR(200) NOT NULL,
+    unite_nominale VARCHAR(30) NOT NULL,
+    statut VARCHAR(30) NOT NULL,
+    date_mise_en_service DATE,
+
+    CONSTRAINT pk_capteur PRIMARY KEY (id_capteur),
+    CONSTRAINT uq_capteur_identifiant_externe UNIQUE (identifiant_externe),
+    CONSTRAINT ck_capteur_statut
+        CHECK (statut IN (
+            'EN_STOCK', 'EN_SERVICE', 'INDISPONIBLE', 'RETIRE', 'ARCHIVE'
+        ))
+);
+
+-- Historise les équipements auxquels un capteur est affecté.
+CREATE TABLE smartcampus.affectation_capteur_equipement (
+    id_affectation_capteur BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    id_capteur BIGINT NOT NULL,
+    id_equipement BIGINT NOT NULL,
+    date_debut TIMESTAMPTZ NOT NULL,
+    date_fin TIMESTAMPTZ,
+    motif_affectation VARCHAR(500),
+
+    CONSTRAINT pk_affectation_capteur_equipement
+        PRIMARY KEY (id_affectation_capteur),
+    CONSTRAINT fk_ace_capteur
+        FOREIGN KEY (id_capteur)
+        REFERENCES smartcampus.capteur (id_capteur)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT fk_ace_equipement
+        FOREIGN KEY (id_equipement)
+        REFERENCES smartcampus.equipement (id_equipement)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT ck_ace_intervalle
+        CHECK (date_fin IS NULL OR date_debut < date_fin),
+    CONSTRAINT ex_ace_capteur_periode
+        EXCLUDE USING gist (
+            id_capteur WITH =,
+            tstzrange(date_debut, date_fin, '[)') WITH &&
+        )
+);
+
+-- La PK comprend la clé de partition; id_mesure seul n'est pas déclaré UNIQUE.
+CREATE TABLE smartcampus.mesure (
+    id_mesure BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    id_capteur BIGINT NOT NULL,
+    horodatage_evenement TIMESTAMPTZ NOT NULL,
+    horodatage_reception TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    valeur NUMERIC(20,6) NOT NULL,
+    unite VARCHAR(30) NOT NULL,
+    qualite VARCHAR(30) NOT NULL,
+    cle_deduplication VARCHAR(160),
+
+    CONSTRAINT pk_mesure
+        PRIMARY KEY (horodatage_evenement, id_mesure),
+    CONSTRAINT fk_mesure_capteur
+        FOREIGN KEY (id_capteur)
+        REFERENCES smartcampus.capteur (id_capteur)
+        ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CONSTRAINT ck_mesure_qualite
+        CHECK (qualite IN ('VALIDE', 'INVALIDE', 'ESTIMEE', 'INCONNUE'))
+) PARTITION BY RANGE (horodatage_evenement);
+
+-- Partitions mensuelles d'exemple. Le gestionnaire de partitions doit
+-- créer les mois requis avant l'ingestion et gérer les périodes historiques.
+CREATE TABLE smartcampus.mesure_2026_01
+    PARTITION OF smartcampus.mesure
+    FOR VALUES FROM ('2026-01-01 00:00:00+00')
+                 TO ('2026-02-01 00:00:00+00');
+
+CREATE TABLE smartcampus.mesure_2026_02
+    PARTITION OF smartcampus.mesure
+    FOR VALUES FROM ('2026-02-01 00:00:00+00')
+                 TO ('2026-03-01 00:00:00+00');
+
+CREATE TABLE smartcampus.mesure_2026_03
+    PARTITION OF smartcampus.mesure
+    FOR VALUES FROM ('2026-03-01 00:00:00+00')
+                 TO ('2026-04-01 00:00:00+00');
+
+-- Index B-tree composites pour les accès temporels et les jointures.
+CREATE INDEX ix_mesure_capteur_evenement
+    ON smartcampus.mesure (id_capteur, horodatage_evenement DESC)
+    INCLUDE (valeur, unite, qualite, horodatage_reception);
+
+CREATE INDEX ix_ace_capteur_debut
+    ON smartcampus.affectation_capteur_equipement
+       (id_capteur, date_debut DESC)
+    INCLUDE (id_equipement, date_fin);
+
+CREATE INDEX ix_ace_equipement_debut
+    ON smartcampus.affectation_capteur_equipement
+       (id_equipement, date_debut DESC)
+    INCLUDE (id_capteur, date_fin);
+
+CREATE INDEX ix_hze_zone_date_debut
+    ON smartcampus.historique_zone_equipement
+       (id_zone, date_debut DESC)
+    INCLUDE (id_equipement, date_fin);
+
+CREATE INDEX ix_hze_equipement_debut
+    ON smartcampus.historique_zone_equipement
+       (id_equipement, date_debut DESC)
+    INCLUDE (id_zone, date_fin);
+
+COMMIT;
+```
+
+Les partitions d’exemple couvrent trois mois de 2026. En production, la création des partitions doit être automatisée et supervisée; sans partition couvrant l’horodatage reçu, l’insertion échoue. La contrainte `UNIQUE(id_batiment, code_zone)` fournit déjà un index B-tree dont la première colonne est `id_batiment`; un index identique ne doit pas être ajouté sans justification mesurée.
