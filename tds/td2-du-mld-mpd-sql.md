@@ -4,7 +4,7 @@
 
 **Objet :** traduction du MCD en schéma relationnel, définition du MPD PostgreSQL, contraintes, index et vérifications d’intégrité.  
 **SGBD de référence :** PostgreSQL 15 ou ultérieur.  
-**Références :** [MCD du projet](../etapes/02-mcd.md) et [MPD détaillé](../etapes/03-mld-mpd.md).
+**Références :** [MCD du projet](../projet/etapes/02-mcd.md) et [MPD détaillé](../projet/etapes/03-mld-mpd.md).
 
 ## Périmètre et conventions
 
