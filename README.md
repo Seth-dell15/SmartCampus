@@ -16,6 +16,7 @@ Les valeurs de dimensionnement sont des hypothèses de travail tirées du cas, e
 - [Sujet du TD 1](./sources/td/td1-du-cahier-des-charges-au-mcd.pdf) — consignes pédagogiques de modélisation.
 - [Sujet du TD 2](./sources/td/TD%202%20%E2%80%93%20Du%20MCD%20au%20MLD%20_%20MPD%20SQL.docx.pdf) — consignes de traduction du MCD vers le MLD et le MPD SQL.
 - [Sujet du TD 3](./sources/td/TD%203%20%E2%80%93%20Normaliser%20ou%20d%C3%A9normaliser.pdf) — consignes d'arbitrage entre normalisation et dénormalisation.
+- [Sujet du TD 4](./sources/td/TD%204%20%E2%80%93%20Paradigmes%20NoSQL%20et%20benchmark.pdf) — consignes d'étude des paradigmes NoSQL et du benchmark.
 
 Les originaux des PDF sont conservés dans le dossier parent `Exo`; les copies organisées du projet sont dans `sources/`.
 
@@ -26,12 +27,14 @@ Les originaux des PDF sont conservés dans le dossier parent `Exo`; les copies o
 - [Dossier final de synthèse — architecture de données, modélisation et résilience IoT](./livrables/synthese-finale-smartcampus.md) — consolidation des huit étapes, du contexte métier aux recommandations, sans résultats de benchmark inventés.
 - [TD 2 — Du MCD au MLD / MPD SQL](./livrables/td2/td2-du-mcd-au-mld-mpd-sql.md) — schéma relationnel, types PostgreSQL, contraintes, index, requêtes métier et tests d’intégrité.
 - [TD 3 — Arbitrage entre normalisation et dénormalisation](./livrables/td3/td3-arbitrage-normalisation-denormalisation.md) — comparaison des trois scénarios, choix de modélisation, synchronisation et critères de réussite.
+- [TD 4 — Paradigmes NoSQL, dataset et benchmark](./livrables/td4/td4-nosql-paradigmes-dataset-benchmark.md) — scénarios document, clé-valeur, wide-column et graphe, dataset de dimensionnement et protocole de benchmark.
 
 | Ordre | Livrable | Contenu |
 |---:|---|---|
 | TD 1 | [TD 1 — Du cahier des charges au MCD](./livrables/td1/td1-du-cahier-des-charges-au-mcd.md) | Entités métier, dictionnaire de données, cardinalités justifiées, historisation et hypothèses ouvertes. |
 | TD 2 | [TD 2 — Du MCD au MLD / MPD SQL](./livrables/td2/td2-du-mcd-au-mld-mpd-sql.md) | Schéma relationnel, types PostgreSQL, contraintes, index et requêtes métier. |
 | TD 3 | [TD 3 — Arbitrage normalisation / dénormalisation](./livrables/td3/td3-arbitrage-normalisation-denormalisation.md) | Tableau d'arbitrage des trois scénarios et mécanismes de synchronisation. |
+| TD 4 | [TD 4 — Paradigmes NoSQL, dataset et benchmark](./livrables/td4/td4-nosql-paradigmes-dataset-benchmark.md) | Modèles candidats, scénarios d'usage, volumétrie et protocole de comparaison reproductible. |
 | 1 | [Étape 1 — Analyse métier et dimensionnement](./livrables/etapes/01-analyse-metier-et-dimensionnement.md) | Acteurs, besoins, règles de gestion, exigences non fonctionnelles, volumes et scénarios d’accès. |
 | 2 | [Étape 2 — MCD](./livrables/etapes/02-mcd.md) | Entités, identifiants, associations, cardinalités et dictionnaire de données. |
 | 3 | [Étape 3 — MLD / MPD](./livrables/etapes/03-mld-mpd.md) | Schéma relationnel, types PostgreSQL, contraintes, index et stratégie de partitionnement. |
